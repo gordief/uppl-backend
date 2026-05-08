@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/lib/pq"
-	"github.com/rs/cors"
+	_ "github.com/lib/pq" // драйвер PostgreSQL
+	"github.com/rs/cors"  // CORS middleware
 )
 
 var db *sql.DB
@@ -66,20 +66,20 @@ var colorCategories = map[string]float64{
 }
 
 var defectMultipliers = map[string]float64{
-	"Замена дисплея (неоригинал)": 0.85,
-	"Замена дисплея (оригинал)":   0.96,
-	"True Tone не работает":       0.97,
-	"Face ID не работает":         0.88,
-	"Не работает верхний динамик": 0.97,
-	"Не работает нижний динамик":  0.98,
-	"Кнопка \"+\" не работает":    0.97,
-	"Кнопка \"-\" не работает":    0.97,
-	"Кнопка включения не работает": 0.96,
+	"Замена дисплея (неоригинал)":      0.85,
+	"Замена дисплея (оригинал)":        0.96,
+	"True Tone не работает":            0.97,
+	"Face ID не работает":              0.88,
+	"Не работает верхний динамик":      0.97,
+	"Не работает нижний динамик":       0.98,
+	"Кнопка \"+\" не работает":         0.97,
+	"Кнопка \"-\" не работает":         0.97,
+	"Кнопка включения не работает":     0.96,
 	"Замена аккумулятора (неоригинал)": 0.95,
 	"Замена аккумулятора (оригинал)":   0.98,
-	"Заднее стекло разбито":        0.92,
-	"Трещина/скол на камере":      0.96,
-	"Заблокированное устройство":   0.15,
+	"Заднее стекло разбито":            0.92,
+	"Трещина/скол на камере":           0.96,
+	"Заблокированное устройство":       0.15,
 }
 
 var cosmeticGrades = map[string]float64{
@@ -220,13 +220,13 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Маржа перекупа
 	margin := 0.14
-	if modelAge < 0.5 {
+	if modelAge == 0 {
 		margin = 0.06
-	} else if modelAge < 1 {
+	} else if modelAge == 1 {
 		margin = 0.08
-	} else if modelAge < 2 {
+	} else if modelAge == 2 {
 		margin = 0.11
-	} else if modelAge < 3 {
+	} else if modelAge == 3 {
 		margin = 0.13
 	}
 
@@ -308,15 +308,25 @@ func adminPromoHandler(w http.ResponseWriter, r *http.Request) {
 
 func getModelYear(model string) int {
 	switch model {
-	case "iPhone X": return 2017
-	case "iPhone XS", "iPhone XS Max", "iPhone XR": return 2018
-	case "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max": return 2019
-	case "iPhone 12", "iPhone 12 mini", "iPhone 12 Pro", "iPhone 12 Pro Max": return 2020
-	case "iPhone 13", "iPhone 13 mini", "iPhone 13 Pro", "iPhone 13 Pro Max": return 2021
-	case "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max": return 2022
-	case "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max": return 2023
-	case "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 16e": return 2024
-	case "iPhone 17", "iPhone 17 Air", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 17e": return 2025
-	default: return 2025
+	case "iPhone X":
+		return 2017
+	case "iPhone XS", "iPhone XS Max", "iPhone XR":
+		return 2018
+	case "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max":
+		return 2019
+	case "iPhone 12", "iPhone 12 mini", "iPhone 12 Pro", "iPhone 12 Pro Max":
+		return 2020
+	case "iPhone 13", "iPhone 13 mini", "iPhone 13 Pro", "iPhone 13 Pro Max":
+		return 2021
+	case "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max":
+		return 2022
+	case "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max":
+		return 2023
+	case "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 16e":
+		return 2024
+	case "iPhone 17", "iPhone 17 Air", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 17e":
+		return 2025
+	default:
+		return 2025
 	}
 }
