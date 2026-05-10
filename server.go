@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 )
 
@@ -228,14 +229,15 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		market = minPrice
 	}
 
+	// ИСПРАВЛЕНО: modelAge — это int (возраст в годах), сравниваем с целыми числами
 	margin := 0.14
-	if modelAge < 0.5 {
+	if modelAge == 0 {
 		margin = 0.06
-	} else if modelAge < 1 {
+	} else if modelAge == 1 {
 		margin = 0.08
-	} else if modelAge < 2 {
+	} else if modelAge == 2 {
 		margin = 0.11
-	} else if modelAge < 3 {
+	} else if modelAge == 3 {
 		margin = 0.13
 	}
 
@@ -262,7 +264,6 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, существует ли пользователь
 	var userID int
 	err := db.QueryRow("SELECT id FROM users WHERE username=$1", req.Username).Scan(&userID)
 	if err != nil {
@@ -271,7 +272,6 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем промокод
 	var durationMin, maxUses, currentUses int
 	err = db.QueryRow("SELECT duration_min, max_uses, current_uses FROM promocodes WHERE code=$1", req.Code).Scan(&durationMin, &maxUses, &currentUses)
 	if err != nil {
@@ -285,7 +285,6 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, использовал ли уже этот пользователь данный промокод
 	var used int
 	err = db.QueryRow("SELECT COUNT(*) FROM promo_usages WHERE user_id=$1 AND code=$2", userID, req.Code).Scan(&used)
 	if err == nil && used > 0 {
@@ -294,7 +293,6 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Начисляем подписку (добавляем время к существующей или создаём новую)
 	expires := time.Now().Add(time.Duration(durationMin) * time.Minute)
 	_, err = db.Exec("UPDATE users SET subscription_expires = $1 WHERE id = $2", expires, userID)
 	if err != nil {
@@ -303,7 +301,6 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Увеличиваем счётчик использований промокода
 	_, err = db.Exec("UPDATE promocodes SET current_uses = current_uses + 1 WHERE code=$1", req.Code)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -311,10 +308,8 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Записываем факт использования
 	_, err = db.Exec("INSERT INTO promo_usages (user_id, code) VALUES ($1, $2)", userID, req.Code)
 	if err != nil {
-		// Не критично, если не запишется, но логируем
 		log.Printf("Failed to insert promo usage: %v", err)
 	}
 
@@ -333,7 +328,6 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, существует ли пользователь
 	var existing int
 	err := db.QueryRow("SELECT id FROM users WHERE username=$1", req.Username).Scan(&existing)
 	if err == nil {
@@ -381,7 +375,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Если подписка истекла, сбрасываем её
 	if expires.Valid && expires.Time.Before(time.Now()) {
 		db.Exec("UPDATE users SET subscription_expires = NULL WHERE username=$1", req.Username)
 	}
