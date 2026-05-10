@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"math"
@@ -9,8 +11,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/lib/pq" // драйвер PostgreSQL
-	"github.com/rs/cors"  // CORS middleware
+	"github.com/rs/cors"
 )
 
 var db *sql.DB
@@ -41,6 +42,16 @@ type ActivateRequest struct {
 type ActivateResponse struct {
 	Success bool   `json:"success"`
 	Expires string `json:"expires,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+type AuthRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	Success bool   `json:"success"`
 	Error   string `json:"error,omitempty"`
 }
 
@@ -89,6 +100,11 @@ var cosmeticGrades = map[string]float64{
 	"poor":      0.72,
 }
 
+func hashPassword(password string) string {
+	hash := sha256.Sum256([]byte(password))
+	return hex.EncodeToString(hash[:])
+}
+
 func main() {
 	var err error
 	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
@@ -100,6 +116,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/calculate", calculateHandler)
 	mux.HandleFunc("/api/activate", activateHandler)
+	mux.HandleFunc("/api/register", registerHandler)
+	mux.HandleFunc("/api/login", loginHandler)
 	mux.HandleFunc("/admin/promo", adminPromoHandler)
 
 	handler := cors.Default().Handler(mux)
@@ -127,10 +145,9 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Регион
 	rawCoeff := regionCoeffs[req.Region]
 	if rawCoeff == 0 {
-		rawCoeff = 0.85 // по умолчанию
+		rawCoeff = 0.85
 	}
 	modelYear := getModelYear(req.Model)
 	modelAge := 2026 - modelYear
@@ -139,7 +156,6 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		regionCoeff = math.Min(rawCoeff+0.05, 1.0)
 	}
 
-	// SIM
 	simCoeff := 1.0
 	switch req.Sim {
 	case "1 Sim":
@@ -150,7 +166,6 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		simCoeff = 1.05
 	}
 
-	// Память
 	storageCoeff := 1.0
 	switch req.Storage {
 	case 128:
@@ -165,13 +180,11 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		storageCoeff = 1.15
 	}
 
-	// Цвет
 	colorCoeff := colorCategories[req.Color]
 	if colorCoeff == 0 {
 		colorCoeff = 1.0
 	}
 
-	// Батарея
 	batteryCoeff := 1.0
 	health := float64(req.Battery)
 	if health >= 80 {
@@ -180,13 +193,11 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		batteryCoeff = 0.95 - (80-health)*(0.10/30)
 	}
 
-	// Внешний вид
 	condCoeff := cosmeticGrades[req.Cosmetic]
 	if condCoeff == 0 {
 		condCoeff = 1.0
 	}
 
-	// Комплект
 	kitCoeff := 0.90
 	if req.Kit["box"] && req.Kit["cable"] {
 		kitCoeff = 0.95
@@ -209,7 +220,6 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Минимальная цена
 	minPrice := 7000.0
 	if req.Model == "iPhone X" || req.Model == "iPhone XS" || req.Model == "iPhone XR" {
 		minPrice = 4500
@@ -218,15 +228,14 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		market = minPrice
 	}
 
-	// Маржа перекупа
 	margin := 0.14
-	if modelAge == 0 {
+	if modelAge < 0.5 {
 		margin = 0.06
-	} else if modelAge == 1 {
+	} else if modelAge < 1 {
 		margin = 0.08
-	} else if modelAge == 2 {
+	} else if modelAge < 2 {
 		margin = 0.11
-	} else if modelAge == 3 {
+	} else if modelAge < 3 {
 		margin = 0.13
 	}
 
@@ -253,9 +262,18 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var durationMin int
-	var maxUses, currentUses int
-	err := db.QueryRow("SELECT duration_min, max_uses, current_uses FROM promocodes WHERE code=$1", req.Code).Scan(&durationMin, &maxUses, &currentUses)
+	// Проверяем, существует ли пользователь
+	var userID int
+	err := db.QueryRow("SELECT id FROM users WHERE username=$1", req.Username).Scan(&userID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ActivateResponse{Success: false, Error: "Пользователь не найден"})
+		return
+	}
+
+	// Проверяем промокод
+	var durationMin, maxUses, currentUses int
+	err = db.QueryRow("SELECT duration_min, max_uses, current_uses FROM promocodes WHERE code=$1", req.Code).Scan(&durationMin, &maxUses, &currentUses)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ActivateResponse{Success: false, Error: "Неверный промокод"})
@@ -267,7 +285,25 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем, использовал ли уже этот пользователь данный промокод
+	var used int
+	err = db.QueryRow("SELECT COUNT(*) FROM promo_usages WHERE user_id=$1 AND code=$2", userID, req.Code).Scan(&used)
+	if err == nil && used > 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ActivateResponse{Success: false, Error: "Вы уже использовали этот промокод"})
+		return
+	}
+
+	// Начисляем подписку (добавляем время к существующей или создаём новую)
 	expires := time.Now().Add(time.Duration(durationMin) * time.Minute)
+	_, err = db.Exec("UPDATE users SET subscription_expires = $1 WHERE id = $2", expires, userID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ActivateResponse{Success: false, Error: "Ошибка сервера"})
+		return
+	}
+
+	// Увеличиваем счётчик использований промокода
 	_, err = db.Exec("UPDATE promocodes SET current_uses = current_uses + 1 WHERE code=$1", req.Code)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -275,8 +311,83 @@ func activateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Записываем факт использования
+	_, err = db.Exec("INSERT INTO promo_usages (user_id, code) VALUES ($1, $2)", userID, req.Code)
+	if err != nil {
+		// Не критично, если не запишется, но логируем
+		log.Printf("Failed to insert promo usage: %v", err)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ActivateResponse{Success: true, Expires: expires.Format(time.RFC3339)})
+}
+
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Проверяем, существует ли пользователь
+	var existing int
+	err := db.QueryRow("SELECT id FROM users WHERE username=$1", req.Username).Scan(&existing)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AuthResponse{Success: false, Error: "Пользователь уже существует"})
+		return
+	}
+
+	hashed := hashPassword(req.Password)
+	_, err = db.Exec("INSERT INTO users (username, password_hash) VALUES ($1, $2)", req.Username, hashed)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AuthResponse{Success: false, Error: "Ошибка регистрации"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(AuthResponse{Success: true})
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	var storedHash string
+	var expires sql.NullTime
+	err := db.QueryRow("SELECT password_hash, subscription_expires FROM users WHERE username=$1", req.Username).Scan(&storedHash, &expires)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AuthResponse{Success: false, Error: "Неверные данные"})
+		return
+	}
+
+	hashed := hashPassword(req.Password)
+	if storedHash != hashed {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AuthResponse{Success: false, Error: "Неверные данные"})
+		return
+	}
+
+	// Если подписка истекла, сбрасываем её
+	if expires.Valid && expires.Time.Before(time.Now()) {
+		db.Exec("UPDATE users SET subscription_expires = NULL WHERE username=$1", req.Username)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(AuthResponse{Success: true})
 }
 
 func adminPromoHandler(w http.ResponseWriter, r *http.Request) {
