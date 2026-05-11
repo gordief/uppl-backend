@@ -53,14 +53,15 @@ type AuthRequest struct {
 
 type AuthResponse struct {
 	Success bool   `json:"success"`
+	Expires string `json:"expires,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
 
 var basePrices = map[string]float64{
-	"iPhone X": 13000, "iPhone XR": 13500, "iPhone XS": 13000, "iPhone XS Max": 16000,
-	"iPhone 11": 15500, "iPhone 11 Pro": 19000, "iPhone 11 Pro Max": 23000,
-	"iPhone 12 mini": 16000, "iPhone 12": 19500, "iPhone 12 Pro": 28000, "iPhone 12 Pro Max": 33000,
-	"iPhone 13 mini": 21000, "iPhone 13": 28500, "iPhone 13 Pro": 37000, "iPhone 13 Pro Max": 43000,
+	"iPhone X": 12500, "iPhone XR": 13000, "iPhone XS": 12500, "iPhone XS Max": 15500,
+	"iPhone 11": 15000, "iPhone 11 Pro": 19000, "iPhone 11 Pro Max": 23000,
+	"iPhone 12 mini": 15500, "iPhone 12": 19000, "iPhone 12 Pro": 28000, "iPhone 12 Pro Max": 33000,
+	"iPhone 13 mini": 20000, "iPhone 13": 28000, "iPhone 13 Pro": 37000, "iPhone 13 Pro Max": 43000,
 	"iPhone 14": 35000, "iPhone 14 Plus": 35000, "iPhone 14 Pro": 46000, "iPhone 14 Pro Max": 50000,
 	"iPhone 15": 45000, "iPhone 15 Plus": 45000, "iPhone 15 Pro": 56000, "iPhone 15 Pro Max": 65000,
 	"iPhone 16": 60000, "iPhone 16 Plus": 60000, "iPhone 16 Pro": 75000, "iPhone 16 Pro Max": 90000,
@@ -169,16 +170,18 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 
 	storageCoeff := 1.0
 	switch req.Storage {
+	case 64:
+		storageCoeff = 0.92
 	case 128:
-		storageCoeff = 1.08
+		storageCoeff = 1.0
 	case 256:
-		storageCoeff = 1.15
+		storageCoeff = 1.08
 	case 512:
-		storageCoeff = 1.15
+		storageCoeff = 1.22
 	case 1024:
-		storageCoeff = 1.15
+		storageCoeff = 1.35
 	case 2048:
-		storageCoeff = 1.15
+		storageCoeff = 1.55
 	}
 
 	colorCoeff := colorCategories[req.Color]
@@ -229,7 +232,6 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		market = minPrice
 	}
 
-	// ИСПРАВЛЕНО: modelAge — это int (возраст в годах), сравниваем с целыми числами
 	margin := 0.14
 	if modelAge == 0 {
 		margin = 0.06
@@ -242,7 +244,7 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	buyPrice := int(math.Floor(market*(1-margin)/500)) * 500
-	sellPrice := int(math.Floor(market/500))*500 - 1
+	sellPrice := int(math.Round(market/500)) * 500
 
 	resp := CalculateResponse{
 		MarketPrice: market,
@@ -379,8 +381,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		db.Exec("UPDATE users SET subscription_expires = NULL WHERE username=$1", req.Username)
 	}
 
+	resp := AuthResponse{Success: true}
+	if expires.Valid && expires.Time.After(time.Now()) {
+		resp.Expires = expires.Time.Format(time.RFC3339)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(AuthResponse{Success: true})
+	json.NewEncoder(w).Encode(resp)
 }
 
 func adminPromoHandler(w http.ResponseWriter, r *http.Request) {
