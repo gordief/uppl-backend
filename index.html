@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Uppl – точная оценка iPhone</title>
+    <link rel="preload" as="image" href="https://i.ibb.co/20L8MgKK/i17p-orange.jpg">
+    <link rel="preload" as="image" href="https://i.ibb.co/5XWXrh54/i17p-deepblue.jpg">
+    <link rel="preload" as="image" href="https://i.ibb.co/GfY6DZK7/i17p-silver.jpg">
+    <style>
+        :root {
+            --bg: #f2f2f7;
+            --card-bg: #ffffff;
+            --text: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent: #007aff;
+            --accent-light: rgba(0,122,255,0.1);
+            --green: #34c759;
+            --red: #ff3b30;
+            --separator: #e5e5ea;
+            --radius-card: 16px;
+            --radius-btn: 12px;
+            --font-title: 18px;
+            --font-body: 15px;
+            --font-caption: 12px;
+            --font-pill: 14px;
+            --tab-height: 80px;
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+        }
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, 'Inter', 'SF Pro Text', system-ui, sans-serif;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .app-shell {
+            width: 100%;
+            max-width: 430px;
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: calc(var(--tab-height) + var(--safe-bottom) + 16px);
+        }
+        .screen {
+            display: none;
+            flex: 1;
+            padding: 16px;
+            animation: fadeIn 0.25s ease;
+        }
+        .screen.active { display: flex; flex-direction: column; gap: 14px; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius-card);
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .section-header { display: flex; align-items: baseline; margin-bottom: 12px; gap: 6px; }
+        .section-title { font-size: var(--font-title); font-weight: 600; letter-spacing: -0.3px; color: var(--text); margin: 0; }
+        .section-sub { font-size: var(--font-pill); color: var(--text-secondary); font-weight: 400; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: var(--font-body); font-weight: 600;
+            border: none; border-radius: var(--radius-btn); padding: 10px 18px;
+            cursor: pointer; transition: all 0.2s cubic-bezier(0.25,0.1,0.25,1);
+            background: var(--card-bg); color: var(--text);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 44px;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 10px rgba(0,122,255,0.25); }
+        .btn-full { width: 100%; }
+        .btn:disabled { opacity: 0.4; pointer-events: none; }
+        .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pill {
+            background: var(--bg); padding: 8px 16px; border-radius: 20px;
+            font-size: var(--font-pill); font-weight: 500; border: 2px solid transparent;
+            transition: 0.15s; cursor: pointer;
+        }
+        .pill.selected { border-color: var(--accent); background: rgba(0,122,255,0.08); color: var(--accent); }
+        .color-dot {
+            width: 36px; height: 36px; border-radius: 50%; margin-right: 10px;
+            border: 2px solid transparent; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: 0.15s;
+        }
+        .color-dot.selected { border-color: var(--accent); transform: scale(1.06); box-shadow: 0 0 0 3px rgba(0,122,255,0.2); }
+        .battery-slider {
+            width: 100%; margin: 10px 0; -webkit-appearance: none; appearance: none;
+            height: 6px; border-radius: 6px;
+            background: linear-gradient(to right, #ff3b30, #ff9500, #ffcc00, #a8e6cf, #34c759);
+            outline: none;
+        }
+        .battery-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 26px; height: 26px; background: #fff;
+            border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            border: 2px solid #d1d1d6;
+        }
+        .phone-preview { display: flex; justify-content: center; margin: 8px 0; }
+        .phone-preview img { width: 180px; height: 260px; object-fit: contain; border-radius: 20px; box-shadow: none; }
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(8px);
+            z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+            visibility: hidden; opacity: 0; transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-overlay.open { visibility: visible; opacity: 1; }
+        .modal-sheet {
+            background: var(--card-bg); width: 100%; max-width: 430px;
+            border-radius: 20px 20px 0 0;
+            max-height: 85vh; overflow-y: auto;
+            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+            box-shadow: 0 -10px 25px rgba(0,0,0,0.12);
+            display: flex; flex-direction: column;
+        }
+        .modal-overlay.open .modal-sheet { transform: translateY(0); }
+        .sticky-header {
+            position: sticky; top: 0; background: var(--card-bg);
+            z-index: 2; padding: 20px 16px 14px;
+        }
+        .sheet-handle {
+            width: 36px; height: 5px; background: #c7c7cc; border-radius: 3px;
+            margin: 0 auto 14px; opacity: 0.6;
+        }
+        .ios-checkbox { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; font-size: var(--font-body); }
+        .ios-checkbox input { display: none; }
+        .ios-checkbox .checkmark {
+            width: 22px; height: 22px; border-radius: 50%; border: 2px solid #c7c7cc;
+            background: #fff; transition: all 0.2s; position: relative;
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+        }
+        .ios-checkbox input:checked + .checkmark { background: var(--accent); border-color: var(--accent); }
+        .ios-checkbox .checkmark::after {
+            content: ''; display: block; width: 6px; height: 10px;
+            border: solid #fff; border-width: 0 2px 2px 0;
+            transform: rotate(45deg); margin-top: -2px; opacity: 0; transition: opacity 0.15s;
+        }
+        .ios-checkbox input:checked + .checkmark::after { opacity: 1; }
+        .arrow-icon { display: inline-flex; transition: transform 0.2s; }
+        .arrow-icon svg { width: 16px; height: 16px; }
+        .open .arrow-icon { transform: rotate(180deg); }
+        .collapsible-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; cursor: pointer; border-top: 1px solid var(--separator); margin-top: 12px;
+        }
+        .collapsible-header.no-border { border-top: none; margin-top: 0; }
+        .collapsible-header .title { font-size: var(--font-body); font-weight: 500; }
+        .badge {
+            background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent);
+            font-size: 12px; font-weight: 600; border-radius: 12px; padding: 2px 8px; margin-right: 8px;
+        }
+        .collapsible-content {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.25,0.1,0.25,1), opacity 0.3s ease;
+            opacity: 0;
+        }
+        .collapsible-content.open { max-height: 500px; opacity: 1; }
+        .defects-container {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.25,0.1,0.25,1), opacity 0.3s ease;
+            opacity: 0;
+        }
+        .defects-container.visible { max-height: 600px; opacity: 1; }
+        .defect-item { transition: opacity 0.2s; }
+        .description-text { font-size: var(--font-caption); color: var(--text-secondary); margin-top: 10px; }
+        .empty-search { text-align: center; padding: 30px 0; color: var(--text-secondary); }
+        .model-item {
+            padding: 12px; border-radius: 12px; margin: 5px 0;
+            background: var(--bg); cursor: pointer; font-size: 15px;
+        }
+        .tab-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: var(--tab-height);
+            padding: 8px 16px var(--safe-bottom);
+            background: rgba(242,242,247,0.82);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-top: 0.5px solid var(--separator);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 20; max-width: 430px; margin: 0 auto;
+        }
+        .tab-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            font-size: 10px; font-weight: 500; color: var(--text-secondary);
+            transition: 0.15s; background: none; border: none;
+            padding: 6px 12px; border-radius: 20px; cursor: pointer;
+        }
+        .tab-item.active { color: var(--accent); }
+        .tab-item svg { width: 24px; height: 24px; fill: currentColor; }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;
+        }
+        .status-active { background: rgba(52,199,89,0.15); color: var(--green); border: 1px solid var(--green); }
+        .status-inactive { background: rgba(142,142,147,0.15); color: var(--text-secondary); border: 1px solid #c7c7cc; }
+        .promo-input {
+            width: 100%; padding: 12px; border-radius: 12px;
+            border: 1px solid var(--separator); background: var(--bg); font-size: 15px;
+        }
+        .promo-help {
+            display: flex; align-items: center; gap: 6px; margin-top: 8px;
+            font-size: 12px; color: var(--text-secondary); cursor: pointer;
+        }
+        .promo-help-circle {
+            width: 18px; height: 18px; border-radius: 50%;
+            background: var(--bg); border: 1px solid var(--separator);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 600; color: var(--accent);
+        }
+        .auth-switch {
+            text-align: center; margin-top: 12px; font-size: 14px; color: var(--text-secondary);
+            cursor: pointer; user-select: none;
+        }
+        .auth-switch span { color: var(--accent); }
+        .avatar-circle {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: var(--accent); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; font-weight: 600; margin: 0 auto 8px; text-transform: uppercase;
+        }
+        .row-between { display: flex; justify-content: space-between; align-items: center; }
+        .logout-modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .logout-modal-buttons .btn { flex: 1; }
+        .lighter-title { color: #4a4a4e; }
+        .auth-form-card {
+            transition: height 0.3s ease;
+        }
+        .price-label {
+            font-size: 14px;
+            color: var(--text);
+            font-weight: 500;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .price-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        @keyframes checkPop {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .promo-success {
+            display: inline-block;
+            color: var(--green);
+            margin-left: 6px;
+            animation: checkPop 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+    <div id="screen-evaluate" class="screen active">
+        <div class="card">
+            <div class="phone-preview" id="phonePreview"><svg width="180" height="260" viewBox="0 0 180 260" fill="none"><rect width="180" height="260" rx="24" fill="#e0e0e0"/><circle cx="90" cy="130" r="40" fill="#b0b0b0"/></svg></div>
+            <button class="btn btn-full" id="selectModelBtn"><span id="selectedModelName">iPhone 17 Pro Max</span><svg style="margin-left:6px;" width="14" height="14" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none"/></svg></button>
+            <button class="btn btn-primary btn-full" id="calculateBtn" style="margin-top:14px; font-size:16px;" disabled>Рассчитать стоимость</button>
+            <div id="promoBlock" style="display:none; margin-top:10px;">
+                <input type="text" class="promo-input" id="promoInput" placeholder="Ввести промокод" maxlength="20" autocomplete="off">
+                <button class="btn btn-full" id="activatePromoBtn" style="margin-top:8px;">Активировать промокод</button>
+                <div class="promo-help" id="promoHelpIcon">
+                    <span class="promo-help-circle">?</span> Где взять промокод?
+                </div>
+                <div id="promoMsg" style="font-size:12px; color:var(--red); margin-top:4px;"></div>
+            </div>
+        </div>
+        <div class="card"><div class="section-header"><div class="section-title">Память</div><span class="section-sub" id="storageLabel"> — 256 ГБ</span></div><div class="pill-group" id="storageGroup"></div></div>
+        <div class="card"><div class="section-header"><div class="section-title">SIM‑карта</div><span class="section-sub" id="simLabel"> — Sim + eSim</span></div><div class="pill-group" id="simGroup"></div></div>
+        <div class="card"><div class="section-header"><div class="section-title">Цвет</div><span class="section-sub" id="colorNameLabel"> — Deep Blue (Тёмно-синий)</span></div><div style="display:flex;align-items:center;" id="colorGroup"></div></div>
+        <div class="card"><div class="section-header"><div class="section-title">АКБ</div><span class="section-sub" id="batteryLabel"> — 92%</span></div><input type="range" class="battery-slider" id="batterySlider" min="50" max="100" value="92" step="1"><div style="display:flex; justify-content:space-between; font-size:var(--font-caption); color:var(--text-secondary);"><span>50%</span><span>100%</span></div></div>
+        <div class="card" id="cosmeticCard"><div class="section-header"><div class="section-title">Внешний вид</div></div><div class="pill-group" id="cosmeticGroup"></div><div id="cosmeticDescription" class="description-text"></div><div id="defectsContainer" class="defects-container"><div class="collapsible-header" id="defectsToggle"><span class="title">Дефекты</span><div style="display:flex; align-items:center;"><span class="badge" id="defectCount">0</span><span class="arrow-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg></span></div></div><div class="collapsible-content" id="defectsPanel"></div></div></div>
+        <div class="card"><div class="collapsible-header no-border" id="kitToggle"><span class="title">Комплект</span><span class="arrow-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg></span></div><div class="collapsible-content" id="kitContent"></div></div>
+    </div>
+    <div id="screen-profile" class="screen">
+        <div class="card auth-form-card" id="authFormCard" style="margin-top: 20px;">
+            <div id="loginForm" style="display: block;">
+                <h2 style="font-size:22px; font-weight:600; margin-bottom:16px; text-align:center;">Вход</h2>
+                <input type="text" id="loginUsername" placeholder="Имя пользователя (англ.)" class="promo-input" style="margin-bottom:8px;">
+                <input type="password" id="loginPassword" placeholder="Пароль" class="promo-input" style="margin-bottom:8px;">
+                <button class="btn btn-primary btn-full" id="loginBtn">Войти</button>
+                <div class="auth-switch">Нет аккаунта? <span id="switchToRegister">Зарегистрироваться</span></div>
+                <div id="authMsg" style="font-size:12px; color:var(--red); margin-top:6px; text-align:center;"></div>
+            </div>
+            <div id="registerForm" style="display: none;">
+                <h2 style="font-size:22px; font-weight:600; margin-bottom:16px; text-align:center;">Регистрация</h2>
+                <input type="text" id="regUsername" placeholder="Имя пользователя (англ.)" class="promo-input" style="margin-bottom:8px;">
+                <input type="password" id="regPassword" placeholder="Пароль" class="promo-input" style="margin-bottom:8px;">
+                <input type="password" id="regPasswordRepeat" placeholder="Повторите пароль" class="promo-input" style="margin-bottom:8px;">
+                <button class="btn btn-primary btn-full" id="registerBtn">Зарегистрироваться</button>
+                <div class="auth-switch">Уже есть аккаунт? <span id="switchToLogin">Войти</span></div>
+                <div id="regMsg" style="font-size:12px; color:var(--red); margin-top:6px; text-align:center;"></div>
+            </div>
+        </div>
+        <div class="card" id="profileAuth" style="display:none; margin-top: 20px;">
+            <div style="text-align:center; margin-bottom:16px;"><div class="avatar-circle" id="avatarLetter">U</div><div style="font-weight:600; font-size:18px;" id="profileUsername"></div></div>
+            <div class="row-between" style="margin-bottom:12px;"><span class="section-sub">Подписка</span><span id="profileSubStatus"></span></div>
+            <div id="profileSubExpiry" style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;"></div>
+            <div class="collapsible-header no-border" id="promoToggle"><span class="title lighter-title">Ввести промокод</span><span class="arrow-icon lighter-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg></span></div>
+            <div class="collapsible-content" id="promoContent" style="margin-top:8px;">
+                <input type="text" class="promo-input" id="profilePromoInput" placeholder="Ввести промокод" maxlength="20" autocomplete="off">
+                <button class="btn btn-full" id="activateProfilePromoBtn" style="margin-top:8px;">Активировать промокод</button>
+                <div class="promo-help" id="profilePromoHelpIcon"><span class="promo-help-circle">?</span> Где взять промокод?</div>
+                <div id="profilePromoMsg" style="font-size:12px; margin-top:4px;"></div>
+            </div>
+            <div style="margin-top:16px;"><button class="btn btn-full" id="profileRegionBtn"><span id="profileRegionLabel">Москва</span><span style="margin-left:auto; color:var(--text-secondary); font-size:var(--font-caption);">~13,3 млн</span></button></div>
+            <button class="btn btn-full" id="logoutBtn" style="color:var(--red); margin-top:16px; font-size:14px;">Выйти из аккаунта</button>
+        </div>
+    </div>
+    <div class="tab-bar">
+        <button class="tab-item active" data-screen="evaluate"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V13h2.09l-4.5-4.5-4.5 4.5H8.59v5.09H6.41V13H4.33l7.67-7.67L19.67 13h-2.08v5.09h-2.18z"/></svg><span>Оценка</span></button>
+        <button class="tab-item" data-screen="profile"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Профиль</span></button>
+    </div>
+    <div class="modal-overlay" id="modelModal"><div class="modal-sheet" id="modelSheet"><div class="sticky-header"><div class="sheet-handle" id="modelHandle"></div><h3 style="font-size:18px; font-weight:600; margin-bottom:14px;">Выберите модель</h3><input type="text" placeholder="Поиск модели" id="modelSearch" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--separator);background:var(--bg);"></div><div style="padding: 0 16px 16px;"><div id="modelList"></div><div id="noResults" class="empty-search" style="display:none;">😔 Ничего не найдено</div></div></div></div>
+    <div class="modal-overlay" id="regionModal"><div class="modal-sheet" id="regionSheet"><div class="sticky-header"><div class="sheet-handle" id="regionHandle"></div><h3 style="font-size:18px; font-weight:600; margin-bottom:14px;">Регион продажи</h3><input type="text" placeholder="Поиск города" id="regionSearch" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--separator);background:var(--bg);"></div><div style="padding: 0 16px 16px;"><div id="regionOptions"></div></div></div></div>
+    <div class="modal-overlay" id="resultModal"><div class="modal-sheet" id="resultSheet"><div class="sticky-header"><div class="sheet-handle" id="resultHandle"></div></div><div style="padding: 0 16px 16px;" id="resultContent"></div></div></div>
+    <div class="modal-overlay" id="logoutModal"><div class="modal-sheet" id="logoutSheet"><div class="sticky-header"><div class="sheet-handle" id="logoutHandle"></div></div><div style="padding: 0 16px 16px;"><h3 style="font-size:18px; font-weight:600; margin-bottom:12px;">Выйти из аккаунта?</h3><p style="color:var(--text-secondary); margin-bottom:20px;">Вы уверены, что хотите выйти?</p><div class="logout-modal-buttons"><button class="btn" id="cancelLogoutBtn">Отмена</button><button class="btn btn-primary" id="confirmLogoutBtn" style="background:var(--red);">Выйти</button></div></div></div></div>
+    <div class="modal-overlay" id="helpModal"><div class="modal-sheet" id="helpSheet"><div class="sticky-header"><div class="sheet-handle" id="helpHandle"></div></div><div style="padding: 0 16px 16px;"><h3 style="font-size:18px; font-weight:600; margin-bottom:12px;">Где взять промокод?</h3><p style="color:var(--text-secondary); margin-bottom:8px;">Приобрести промокод можно через нашего менеджера в Telegram.</p><p style="color:var(--text-secondary);">Менеджер: <strong>@z3nux</strong></p><button class="btn btn-full" id="closeHelpBtn" style="margin-top:16px;">Понятно</button></div></div></div>
+    <div class="modal-overlay" id="expiredModal">
+        <div class="modal-sheet" id="expiredSheet">
+            <div class="sticky-header"><div class="sheet-handle" id="expiredHandle"></div></div>
+            <div style="padding: 0 16px 16px;">
+                <h3 style="font-size:18px; font-weight:600; margin-bottom:12px;">Срок действия подписки истёк</h3>
+                <p style="color:var(--text-secondary); margin-bottom:8px;">Ваша подписка закончилась. Чтобы продолжить пользоваться сервисом, получите новый промокод.</p>
+                <p style="color:var(--text-secondary);">Приобрести промокод можно через нашего менеджера в Telegram: <strong>@z3nux</strong></p>
+                <p style="color:var(--text-secondary);">Наш Telegram-канал: <strong>@uppltg</strong></p>
+                <button class="btn btn-full" id="closeExpiredBtn" style="margin-top:16px;">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    const models = [
+        { name: "iPhone X", year: 2017, storage: [64,256], colors: ["Space Gray", "Silver"], sim: ["1 Sim"] },
+        { name: "iPhone XS", year: 2018, storage: [64,256,512], colors: ["Space Gray", "Silver", "Gold"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone XS Max", year: 2018, storage: [64,256,512], colors: ["Space Gray", "Silver", "Gold"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone XR", year: 2018, storage: [64,128,256], colors: ["Black", "White", "Blue", "Yellow", "Coral", "Product Red"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 11", year: 2019, storage: [64,128,256], colors: ["Black", "White", "Green", "Yellow", "Purple", "Product Red"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 11 Pro", year: 2019, storage: [64,256,512], colors: ["Space Gray", "Silver", "Gold", "Midnight Green"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 11 Pro Max", year: 2019, storage: [64,256,512], colors: ["Space Gray", "Silver", "Gold", "Midnight Green"], sim: ["1 Sim","Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 12 mini", year: 2020, storage: [64,128,256], colors: ["Black", "White", "Blue", "Green", "Purple", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 12", year: 2020, storage: [64,128,256], colors: ["Black", "White", "Blue", "Green", "Purple", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 12 Pro", year: 2020, storage: [128,256,512], colors: ["Graphite", "Silver", "Gold", "Pacific Blue"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 12 Pro Max", year: 2020, storage: [128,256,512], colors: ["Graphite", "Silver", "Gold", "Pacific Blue"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 13 mini", year: 2021, storage: [128,256,512], colors: ["Midnight", "Starlight", "Blue", "Pink", "Green", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 13", year: 2021, storage: [128,256,512], colors: ["Midnight", "Starlight", "Blue", "Pink", "Green", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 13 Pro", year: 2021, storage: [128,256,512,1024], colors: ["Graphite", "Silver", "Gold", "Sierra Blue", "Alpine Green"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 13 Pro Max", year: 2021, storage: [128,256,512,1024], colors: ["Graphite", "Silver", "Gold", "Sierra Blue", "Alpine Green"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 14", year: 2022, storage: [128,256,512], colors: ["Midnight", "Starlight", "Blue", "Purple", "Yellow", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 14 Plus", year: 2022, storage: [128,256,512], colors: ["Midnight", "Starlight", "Blue", "Purple", "Yellow", "Product Red"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 14 Pro", year: 2022, storage: [128,256,512,1024], colors: ["Space Black", "Silver", "Gold", "Deep Purple"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 14 Pro Max", year: 2022, storage: [128,256,512,1024], colors: ["Space Black", "Silver", "Gold", "Deep Purple"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 15", year: 2023, storage: [128,256,512], colors: ["Black", "Blue", "Green", "Yellow", "Pink"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 15 Plus", year: 2023, storage: [128,256,512], colors: ["Black", "Blue", "Green", "Yellow", "Pink"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 15 Pro", year: 2023, storage: [128,256,512,1024], colors: ["Black Titanium", "White Titanium", "Blue Titanium", "Natural Titanium"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 15 Pro Max", year: 2023, storage: [256,512,1024], colors: ["Black Titanium", "White Titanium", "Blue Titanium", "Natural Titanium"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 16", year: 2024, storage: [128,256,512], colors: ["Black", "White", "Pink", "Teal", "Ultramarine"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 16 Plus", year: 2024, storage: [128,256,512], colors: ["Black", "White", "Pink", "Teal", "Ultramarine"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 16 Pro", year: 2024, storage: [128,256,512,1024], colors: ["Black Titanium", "White Titanium", "Natural Titanium", "Desert Titanium"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 16 Pro Max", year: 2024, storage: [256,512,1024], colors: ["Black Titanium", "White Titanium", "Natural Titanium", "Desert Titanium"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 16e", year: 2025, storage: [128,256,512], colors: ["Black", "White"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 17", year: 2025, storage: [256,512], colors: ["Black", "White", "Lavender", "Mist Blue", "Sage"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone Air", year: 2025, storage: [256,512,1024], colors: ["Space Black", "Cloud White", "Sky Blue", "Light Gold"], sim: ["eSim"] },
+        { name: "iPhone 17 Pro", year: 2025, storage: [256,512,1024], colors: ["Silver", "Deep Blue", "Cosmic Orange"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 17 Pro Max", year: 2025, storage: [256,512,1024,2048], colors: ["Silver", "Deep Blue", "Cosmic Orange"], sim: ["Sim + eSim","2 Sim","eSim"] },
+        { name: "iPhone 17e", year: 2025, storage: [256,512], colors: ["Black", "White", "Soft Pink"], sim: ["Sim + eSim","2 Sim","eSim"] },
+    ];
+
+    const phoneImages = {
+        "iPhone 17e|Black": "https://i.ibb.co/Q3WfsjxM/i17e-black.jpg",
+        "iPhone 17e|White": "https://i.ibb.co/F406nqf1/i17e-white.jpg",
+        "iPhone 17e|Soft Pink": "https://i.ibb.co/TxR87TMy/i17e-softpink.jpg",
+        "iPhone 17 Pro Max|Silver": "https://i.ibb.co/GfY6DZK7/i17p-silver.jpg",
+        "iPhone 17 Pro Max|Deep Blue": "https://i.ibb.co/5XWXrh54/i17p-deepblue.jpg",
+        "iPhone 17 Pro Max|Cosmic Orange": "https://i.ibb.co/20L8MgKK/i17p-orange.jpg",
+        "iPhone 17 Pro|Silver": "https://i.ibb.co/GfY6DZK7/i17p-silver.jpg",
+        "iPhone 17 Pro|Deep Blue": "https://i.ibb.co/5XWXrh54/i17p-deepblue.jpg",
+        "iPhone 17 Pro|Cosmic Orange": "https://i.ibb.co/20L8MgKK/i17p-orange.jpg",
+        "iPhone Air|Space Black": "https://i.ibb.co/BVFCcrX5/i17air-spaceblack.jpg",
+        "iPhone Air|Cloud White": "https://i.ibb.co/0p0sY54j/i17air-cloudwhite.jpg",
+        "iPhone Air|Sky Blue": "https://i.ibb.co/d0vr8m08/i17air-skyblue.jpg",
+        "iPhone Air|Light Gold": "https://i.ibb.co/wvzNj0W/i17air-lightgold.jpg",
+        "iPhone 17|Black": "https://i.ibb.co/xKJwxSSR/i17-black.jpg",
+        "iPhone 17|White": "https://i.ibb.co/7JdTNVcJ/i17-white.jpg",
+        "iPhone 17|Lavender": "https://i.ibb.co/qYgmHYBp/i17-lavender.jpg",
+        "iPhone 17|Mist Blue": "https://i.ibb.co/HcXbp6G/i17-mistblue.jpg",
+        "iPhone 17|Sage": "https://i.ibb.co/wNJG39v7/i17-sage.jpg",
+        "iPhone 16e|Black": "https://i.ibb.co/23PdmTqX/i16e-black.png",
+        "iPhone 16e|White": "https://i.ibb.co/5Xdqyj8x/i16e-white.png",
+        "iPhone 16 Pro Max|Black Titanium": "https://i.ibb.co/LdMJZvXs/i16pm-blacktitanium.jpg",
+        "iPhone 16 Pro Max|White Titanium": "https://i.ibb.co/dwk4psc0/i16pm-whitetitanium.jpg",
+        "iPhone 16 Pro Max|Natural Titanium": "https://i.ibb.co/RTqr9tjC/i16pm-naturaltitanium.jpg",
+        "iPhone 16 Pro Max|Desert Titanium": "https://i.ibb.co/5Xm0m0C9/i16pm-deserttitanium.jpg",
+        "iPhone 16 Pro|Black Titanium": "https://i.ibb.co/LdMJZvXs/i16pm-blacktitanium.jpg",
+        "iPhone 16 Pro|White Titanium": "https://i.ibb.co/dwk4psc0/i16pm-whitetitanium.jpg",
+        "iPhone 16 Pro|Natural Titanium": "https://i.ibb.co/RTqr9tjC/i16pm-naturaltitanium.jpg",
+        "iPhone 16 Pro|Desert Titanium": "https://i.ibb.co/5Xm0m0C9/i16pm-deserttitanium.jpg",
+        "iPhone 16 Plus|Black": "https://i.ibb.co/84gBgmLj/i16-black.jpg",
+        "iPhone 16 Plus|White": "https://i.ibb.co/zhfmqRwx/i16-white.jpg",
+        "iPhone 16 Plus|Pink": "https://i.ibb.co/QjqYJm2x/i16-pink.jpg",
+        "iPhone 16 Plus|Teal": "https://i.ibb.co/d00Zvnjt/i16-teal.jpg",
+        "iPhone 16 Plus|Ultramarine": "https://i.ibb.co/jkYD9L7m/i16-ultramarine.jpg",
+        "iPhone 16|Black": "https://i.ibb.co/84gBgmLj/i16-black.jpg",
+        "iPhone 16|White": "https://i.ibb.co/zhfmqRwx/i16-white.jpg",
+        "iPhone 16|Pink": "https://i.ibb.co/QjqYJm2x/i16-pink.jpg",
+        "iPhone 16|Teal": "https://i.ibb.co/d00Zvnjt/i16-teal.jpg",
+        "iPhone 16|Ultramarine": "https://i.ibb.co/jkYD9L7m/i16-ultramarine.jpg",
+        "iPhone 15 Pro Max|Black Titanium": "https://i.ibb.co/m5RWnW5N/i15pm-blacktitanium.jpg",
+        "iPhone 15 Pro Max|White Titanium": "https://i.ibb.co/mryzQq7H/i15pm-whitetitanium.jpg",
+        "iPhone 15 Pro Max|Blue Titanium": "https://i.ibb.co/QtTBx83/i15pm-bluetitanium.jpg",
+        "iPhone 15 Pro Max|Natural Titanium": "https://i.ibb.co/Nnr79zGt/i15pm-naturaltitanium.jpg",
+        "iPhone 15 Pro|Black Titanium": "https://i.ibb.co/m5RWnW5N/i15pm-blacktitanium.jpg",
+        "iPhone 15 Pro|White Titanium": "https://i.ibb.co/mryzQq7H/i15pm-whitetitanium.jpg",
+        "iPhone 15 Pro|Blue Titanium": "https://i.ibb.co/QtTBx83/i15pm-bluetitanium.jpg",
+        "iPhone 15 Pro|Natural Titanium": "https://i.ibb.co/Nnr79zGt/i15pm-naturaltitanium.jpg",
+        "iPhone 15 Plus|Black": "https://i.ibb.co/1YVxQ4rv/i15-black.jpg",
+        "iPhone 15 Plus|Blue": "https://i.ibb.co/Gvxf9HCc/i15-blue.jpg",
+        "iPhone 15 Plus|Green": "https://i.ibb.co/Sw5bzHLD/i15-green.jpg",
+        "iPhone 15 Plus|Yellow": "https://i.ibb.co/TMCbrXFt/i15-yellow.jpg",
+        "iPhone 15 Plus|Pink": "https://i.ibb.co/GvKJFJPF/i15-pink.jpg",
+        "iPhone 15|Black": "https://i.ibb.co/1YVxQ4rv/i15-black.jpg",
+        "iPhone 15|Blue": "https://i.ibb.co/Gvxf9HCc/i15-blue.jpg",
+        "iPhone 15|Green": "https://i.ibb.co/Sw5bzHLD/i15-green.jpg",
+        "iPhone 15|Yellow": "https://i.ibb.co/TMCbrXFt/i15-yellow.jpg",
+        "iPhone 15|Pink": "https://i.ibb.co/GvKJFJPF/i15-pink.jpg",
+        "iPhone 14 Pro Max|Space Black": "https://i.ibb.co/YMRtxFF/i14pm-spaceblack.webp",
+        "iPhone 14 Pro Max|Silver": "https://i.ibb.co/VW55n2N6/i14pm-silver.webp",
+        "iPhone 14 Pro Max|Gold": "https://i.ibb.co/21YCDzfC/i14pm-gold.webp",
+        "iPhone 14 Pro Max|Deep Purple": "https://i.ibb.co/GXkcz3w/i14pm-deeppurple.webp",
+        "iPhone 14 Pro|Space Black": "https://i.ibb.co/YMRtxFF/i14pm-spaceblack.webp",
+        "iPhone 14 Pro|Silver": "https://i.ibb.co/VW55n2N6/i14pm-silver.webp",
+        "iPhone 14 Pro|Gold": "https://i.ibb.co/21YCDzfC/i14pm-gold.webp",
+        "iPhone 14 Pro|Deep Purple": "https://i.ibb.co/GXkcz3w/i14pm-deeppurple.webp",
+        "iPhone 14 Plus|Midnight": "https://i.ibb.co/RTt7FMWh/i14-midnight.jpg",
+        "iPhone 14 Plus|Starlight": "https://i.ibb.co/7NSMRrYg/i14-starlight.jpg",
+        "iPhone 14 Plus|Blue": "https://i.ibb.co/HfzHPN4M/i14-blue.jpg",
+        "iPhone 14 Plus|Purple": "https://i.ibb.co/ymWqvqd7/i14-purple.jpg",
+        "iPhone 14 Plus|Yellow": "https://i.ibb.co/VpkWRy28/i14-yellow.webp",
+        "iPhone 14 Plus|Product Red": "https://i.ibb.co/4gjgkcNj/i14-red.jpg",
+        "iPhone 14|Midnight": "https://i.ibb.co/RTt7FMWh/i14-midnight.jpg",
+        "iPhone 14|Starlight": "https://i.ibb.co/7NSMRrYg/i14-starlight.jpg",
+        "iPhone 14|Blue": "https://i.ibb.co/HfzHPN4M/i14-blue.jpg",
+        "iPhone 14|Purple": "https://i.ibb.co/ymWqvqd7/i14-purple.jpg",
+        "iPhone 14|Yellow": "https://i.ibb.co/VpkWRy28/i14-yellow.webp",
+        "iPhone 14|Product Red": "https://i.ibb.co/4gjgkcNj/i14-red.jpg",
+        "iPhone 13 Pro Max|Graphite": "https://i.ibb.co/NRxpg9s/i13pm-graphite.webp",
+        "iPhone 13 Pro Max|Silver": "https://i.ibb.co/4ZF572RD/i13pm-silver.webp",
+        "iPhone 13 Pro Max|Gold": "https://i.ibb.co/wZcWQSFJ/i13pm-gold.webp",
+        "iPhone 13 Pro Max|Sierra Blue": "https://i.ibb.co/4Z3Kspx8/i13pm-sierrablue.webp",
+        "iPhone 13 Pro Max|Alpine Green": "https://i.ibb.co/kVJyFxsh/i13pm-alpinegreen.webp",
+        "iPhone 13 Pro|Graphite": "https://i.ibb.co/NRxpg9s/i13pm-graphite.webp",
+        "iPhone 13 Pro|Silver": "https://i.ibb.co/4ZF572RD/i13pm-silver.webp",
+        "iPhone 13 Pro|Gold": "https://i.ibb.co/wZcWQSFJ/i13pm-gold.webp",
+        "iPhone 13 Pro|Sierra Blue": "https://i.ibb.co/4Z3Kspx8/i13pm-sierrablue.webp",
+        "iPhone 13 Pro|Alpine Green": "https://i.ibb.co/kVJyFxsh/i13pm-alpinegreen.webp",
+        "iPhone 13|Midnight": "https://i.ibb.co/V056x3ww/i13-midnight.webp",
+        "iPhone 13|Starlight": "https://i.ibb.co/1fg9Z3Q2/i13-starlight.webp",
+        "iPhone 13|Blue": "https://i.ibb.co/BVFyPKxn/i13-blue.webp",
+        "iPhone 13|Pink": "https://i.ibb.co/C54nyj5m/i13-pink.webp",
+        "iPhone 13|Green": "https://i.ibb.co/qFc3dJzZ/i13-green.webp",
+        "iPhone 13|Product Red": "https://i.ibb.co/TBp8TWRr/i13-red.webp",
+        "iPhone 13 mini|Midnight": "https://i.ibb.co/V056x3ww/i13-midnight.webp",
+        "iPhone 13 mini|Starlight": "https://i.ibb.co/1fg9Z3Q2/i13-starlight.webp",
+        "iPhone 13 mini|Blue": "https://i.ibb.co/BVFyPKxn/i13-blue.webp",
+        "iPhone 13 mini|Pink": "https://i.ibb.co/C54nyj5m/i13-pink.webp",
+        "iPhone 13 mini|Green": "https://i.ibb.co/qFc3dJzZ/i13-green.webp",
+        "iPhone 13 mini|Product Red": "https://i.ibb.co/TBp8TWRr/i13-red.webp",
+        "iPhone 12 Pro Max|Graphite": "https://i.ibb.co/Y4BN4gZj/i12pm-graphite.webp",
+        "iPhone 12 Pro Max|Silver": "https://i.ibb.co/QvYvk7KX/i12pm-silver.webp",
+        "iPhone 12 Pro Max|Gold": "https://i.ibb.co/7tmSWhhH/i12pm-gold.webp",
+        "iPhone 12 Pro Max|Pacific Blue": "https://i.ibb.co/HLQDFcxS/i12pm-pacificblue.webp",
+        "iPhone 12 Pro|Graphite": "https://i.ibb.co/Y4BN4gZj/i12pm-graphite.webp",
+        "iPhone 12 Pro|Silver": "https://i.ibb.co/QvYvk7KX/i12pm-silver.webp",
+        "iPhone 12 Pro|Gold": "https://i.ibb.co/7tmSWhhH/i12pm-gold.webp",
+        "iPhone 12 Pro|Pacific Blue": "https://i.ibb.co/HLQDFcxS/i12pm-pacificblue.webp",
+        "iPhone 12|Black": "https://i.ibb.co/7xwjKykj/i12-black.jpg",
+        "iPhone 12|White": "https://i.ibb.co/gFhdMjvf/i12-white.jpg",
+        "iPhone 12|Blue": "https://i.ibb.co/nMT2y0nx/i12-blue.jpg",
+        "iPhone 12|Green": "https://i.ibb.co/FqL8vNwt/i12-green.jpg",
+        "iPhone 12|Purple": "https://i.ibb.co/jvHHTD5p/i12-purple.jpg",
+        "iPhone 12|Product Red": "https://i.ibb.co/Xx0VYbSG/i12-red.jpg",
+        "iPhone 12 mini|Black": "https://i.ibb.co/7xwjKykj/i12-black.jpg",
+        "iPhone 12 mini|White": "https://i.ibb.co/gFhdMjvf/i12-white.jpg",
+        "iPhone 12 mini|Blue": "https://i.ibb.co/nMT2y0nx/i12-blue.jpg",
+        "iPhone 12 mini|Green": "https://i.ibb.co/FqL8vNwt/i12-green.jpg",
+        "iPhone 12 mini|Purple": "https://i.ibb.co/jvHHTD5p/i12-purple.jpg",
+        "iPhone 12 mini|Product Red": "https://i.ibb.co/Xx0VYbSG/i12-red.jpg",
+        "iPhone 11 Pro Max|Space Gray": "https://i.ibb.co/3yXJTzZZ/i11pm-spacegray.jpg",
+        "iPhone 11 Pro Max|Silver": "https://i.ibb.co/gbsK0Hff/i11pm-silver.jpg",
+        "iPhone 11 Pro Max|Gold": "https://i.ibb.co/5Wd1sGyJ/i11pm-gold.jpg",
+        "iPhone 11 Pro Max|Midnight Green": "https://i.ibb.co/xtY4q1Bt/i11pm-midnightgreen.jpg",
+        "iPhone 11 Pro|Space Gray": "https://i.ibb.co/3yXJTzZZ/i11pm-spacegray.jpg",
+        "iPhone 11 Pro|Silver": "https://i.ibb.co/gbsK0Hff/i11pm-silver.jpg",
+        "iPhone 11 Pro|Gold": "https://i.ibb.co/5Wd1sGyJ/i11pm-gold.jpg",
+        "iPhone 11 Pro|Midnight Green": "https://i.ibb.co/xtY4q1Bt/i11pm-midnightgreen.jpg",
+        "iPhone 11|Black": "https://i.ibb.co/yBKrBbxX/i11-black.jpg",
+        "iPhone 11|White": "https://i.ibb.co/KzfjLn57/i11-white.jpg",
+        "iPhone 11|Green": "https://i.ibb.co/rG6HKKZ2/i11-green.jpg",
+        "iPhone 11|Yellow": "https://i.ibb.co/dsVTzZxj/i11yellow.jpg",
+        "iPhone 11|Purple": "https://i.ibb.co/mCgs0T0L/i11-purple.jpg",
+        "iPhone 11|Product Red": "https://i.ibb.co/h1wCygsh/i11-red.jpg",
+        "iPhone XR|Black": "https://i.ibb.co/jPMk7qCW/xr-black.webp",
+        "iPhone XR|White": "https://i.ibb.co/HTRTZkbv/xr-white.webp",
+        "iPhone XR|Blue": "https://i.ibb.co/ccmWZDdR/xr-blue.webp",
+        "iPhone XR|Yellow": "https://i.ibb.co/VpLGjLxL/xr-yellow.webp",
+        "iPhone XR|Coral": "https://i.ibb.co/mCH8nVVH/xr-coral.webp",
+        "iPhone XR|Product Red": "https://i.ibb.co/dJP3kmDQ/xr-red.webp",
+        "iPhone XS Max|Space Gray": "https://i.ibb.co/Fqhn6q4J/xs-spacegray.webp",
+        "iPhone XS Max|Silver": "https://i.ibb.co/ZDKrbTy/xs-silver.webp",
+        "iPhone XS Max|Gold": "https://i.ibb.co/MyKJfbmc/xs-gold.webp",
+        "iPhone XS|Space Gray": "https://i.ibb.co/Fqhn6q4J/xs-spacegray.webp",
+        "iPhone XS|Silver": "https://i.ibb.co/ZDKrbTy/xs-silver.webp",
+        "iPhone XS|Gold": "https://i.ibb.co/MyKJfbmc/xs-gold.webp",
+        "iPhone X|Space Gray": "https://i.ibb.co/gMjBjd6s/x-spacegray.webp",
+        "iPhone X|Silver": "https://i.ibb.co/MxNhPGrq/x-silver.webp"
+    };
+
+    const cities = [{ name: "Москва", population: "~13,3 млн", coeff: 1.0 }, { name: "Санкт-Петербург", population: "~5,65 млн", coeff: 0.95 }, { name: "Новосибирск", population: "~1,64 млн", coeff: 0.88 }, { name: "Екатеринбург", population: "~1,54 млн", coeff: 0.88 }, { name: "Казань", population: "~1,33 млн", coeff: 0.88 }, { name: "Нижний Новгород", population: "~1,22 млн", coeff: 0.88 }, { name: "Краснодар", population: "~1,26 млн", coeff: 0.88 }, { name: "Ростов-на-Дону", population: "~1,14 млн", coeff: 0.88 }, { name: "Уфа", population: "~1,19 млн", coeff: 0.88 }, { name: "Челябинск", population: "~1,18 млн", coeff: 0.88 }, { name: "Воронеж", population: "~1,04 млн", coeff: 0.88 }, { name: "Пермь", population: "~1,03 млн", coeff: 0.88 }, { name: "Волгоград", population: "~1,01 млн", coeff: 0.88 }, { name: "Красноярск", population: "~1,21 млн", coeff: 0.88 }, { name: "Саратов", population: "~886 тыс", coeff: 0.85 }, { name: "Тюмень", population: "~872 тыс", coeff: 0.85 }, { name: "Тольятти", population: "~663 тыс", coeff: 0.85 }, { name: "Ижевск", population: "~616 тыс", coeff: 0.85 }, { name: "Барнаул", population: "~689 тыс", coeff: 0.85 }, { name: "Ульяновск", population: "~634 тыс", coeff: 0.85 }, { name: "Иркутск", population: "~623 тыс", coeff: 0.85 }, { name: "Хабаровск", population: "~617 тыс", coeff: 0.85 }, { name: "Ярославль", population: "~577 тыс", coeff: 0.85 }, { name: "Владивосток", population: "~604 тыс", coeff: 0.85 }, { name: "Махачкала", population: "~623 тыс", coeff: 0.85 }, { name: "Омск", population: "~1,11 млн", coeff: 0.85 }, { name: "Самара", population: "~1,16 млн", coeff: 0.85 }, { name: "Калининград", population: "~490 тыс", coeff: 0.82 }, { name: "Сочи", population: "~444 тыс", coeff: 0.82 }, { name: "Тула", population: "~482 тыс", coeff: 0.82 }, { name: "Киров", population: "~518 тыс", coeff: 0.82 }, { name: "Рязань", population: "~537 тыс", coeff: 0.82 }, { name: "Липецк", population: "~496 тыс", coeff: 0.82 }, { name: "Пятигорск", population: "~144 тыс", coeff: 0.82 }, { name: "Кемерово", population: "~549 тыс", coeff: 0.82 }, { name: "Владимир", population: "~352 тыс", coeff: 0.82 }, { name: "Ставрополь", population: "~454 тыс", coeff: 0.82 }, { name: "Тверь", population: "~415 тыс", coeff: 0.82 }, { name: "Архангельск", population: "~344 тыс", coeff: 0.82 }, { name: "Мурманск", population: "~287 тыс", coeff: 0.82 }, { name: "Вологда", population: "~312 тыс", coeff: 0.82 }, { name: "Смоленск", population: "~316 тыс", coeff: 0.82 }, { name: "Великий Новгород", population: "~225 тыс", coeff: 0.82 }, { name: "Петрозаводск", population: "~280 тыс", coeff: 0.82 }, { name: "Брянск", population: "~417 тыс", coeff: 0.82 }, { name: "Иваново", population: "~404 тыс", coeff: 0.82 }, { name: "Тамбов", population: "~288 тыс", coeff: 0.82 }, { name: "Кострома", population: "~268 тыс", coeff: 0.82 }, { name: "Новороссийск", population: "~275 тыс", coeff: 0.82 }, { name: "Грозный", population: "~324 тыс", coeff: 0.82 }, { name: "Владикавказ", population: "~306 тыс", coeff: 0.82 }, { name: "Псков", population: "~210 тыс", coeff: 0.78 }, { name: "Кисловодск", population: "~129 тыс", coeff: 0.78 }, { name: "Анапа", population: "~81 тыс", coeff: 0.78 }, { name: "Геленджик", population: "~76 тыс", coeff: 0.78 }, { name: "Южно-Сахалинск", population: "~198 тыс", coeff: 0.78 }, { name: "Нальчик", population: "~239 тыс", coeff: 0.78 }, { name: "Элиста", population: "~103 тыс", coeff: 0.78 }, { name: "Дербент", population: "~125 тыс", coeff: 0.78 }, { name: "Ессентуки", population: "~113 тыс", coeff: 0.78 }, { name: "Коломна", population: "~143 тыс", coeff: 0.78 }, { name: "Сергиев Посад", population: "~107 тыс", coeff: 0.78 }, { name: "Химки", population: "~254 тыс", coeff: 0.78 }, { name: "Красногорск", population: "~171 тыс", coeff: 0.78 }, { name: "Эсто-Садок", population: "~1 тыс", coeff: 0.72 }, { name: "Домбай", population: "~1 тыс", coeff: 0.72 }, { name: "Архыз", population: "~1 тыс", coeff: 0.72 }, { name: "Териберка", population: "~1 тыс", coeff: 0.72 }, { name: "Суздаль", population: "~10 тыс", coeff: 0.72 }, { name: "Переславль-Залесский", population: "~38 тыс", coeff: 0.72 }, { name: "Зеленоградск", population: "~15 тыс", coeff: 0.72 }, { name: "Светлогорск", population: "~20 тыс", coeff: 0.72 }, { name: "Выборг", population: "~75 тыс", coeff: 0.72 }, { name: "Сортавала", population: "~19 тыс", coeff: 0.72 }, { name: "Витязево", population: "~8 тыс", coeff: 0.72 }, { name: "Гагра", population: "~15 тыс", coeff: 0.72 }];
+    const defectNames = ['Замена дисплея (неоригинал)', 'Замена дисплея (оригинал)', 'True Tone не работает', 'Face ID не работает', 'Не работает верхний динамик', 'Не работает нижний динамик', 'Кнопка "+" не работает', 'Кнопка "-" не работает', 'Кнопка включения не работает', 'Замена аккумулятора (неоригинал)', 'Замена аккумулятора (оригинал)', 'Заднее стекло разбито', 'Трещина/скол на камере', 'Заблокированное устройство'];
+    const cosmeticGrades = [{ id: 'excellent', label: 'Отличное', desc: 'Микроцарапины, незаметные' }, { id: 'good', label: 'Хорошее', desc: 'Мелкие царапины, без сколов' }, { id: 'fair', label: 'Удовлетворительное', desc: 'Глубокие царапины, сколы' }, { id: 'poor', label: 'Плохое', desc: 'Трещины корпуса/экрана' }];
+    let selectedModel = models.find(m => m.name === "iPhone 17 Pro Max");
+    let selectedStorage = selectedModel.storage[0];
+    let selectedSim = selectedModel.sim[0];
+    let selectedColor = selectedModel.colors[0];
+    let batteryHealth = 92;
+    let cosmetic = 'excellent';
+    let selectedDefects = {};
+    let kitOptions = { box: false, cable: false, sticker: false, receipt: false };
+    let region = { name: 'Москва', coeff: 1.0, population: '~13,3 млн' };
+    function saveState() { const state = { activeScreen: document.querySelector('.screen.active')?.id?.replace('screen-', '') || 'evaluate', selectedModelName: selectedModel.name, selectedStorage, selectedSim, selectedColor, batteryHealth, cosmetic, selectedDefects, kitOptions, region }; localStorage.setItem('uppl_state', JSON.stringify(state)); }
+    function loadState() { const saved = localStorage.getItem('uppl_state'); if (!saved) return; try { const state = JSON.parse(saved); if (state.activeScreen) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('screen-' + state.activeScreen)?.classList.add('active'); document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); document.querySelector(`.tab-item[data-screen="${state.activeScreen}"]`)?.classList.add('active'); } if (state.selectedModelName) selectedModel = models.find(m => m.name === state.selectedModelName) || selectedModel; selectedStorage = state.selectedStorage || selectedStorage; selectedSim = state.selectedSim || selectedSim; selectedColor = state.selectedColor || selectedColor; batteryHealth = state.batteryHealth || batteryHealth; cosmetic = state.cosmetic || cosmetic; selectedDefects = state.selectedDefects || {}; kitOptions = state.kitOptions || { box: false, cable: false, sticker: false, receipt: false }; if (state.region) region = state.region; } catch (e) {} }
+    function getAvailableDefects() { return defectNames; }
+    function renderPhonePreview() { const container = document.getElementById('phonePreview'); const imgUrl = phoneImages[`${selectedModel.name}|${selectedColor}`] || null; if (imgUrl) { container.innerHTML = `<img src="${imgUrl}" alt="${selectedModel.name} ${selectedColor}" />`; return; } container.innerHTML = '<svg width="180" height="260" viewBox="0 0 180 260" fill="none"><rect width="180" height="260" rx="24" fill="#e0e0e0"/><circle cx="90" cy="130" r="40" fill="#b0b0b0"/></svg>'; }
+    function renderStorage() { const group = document.getElementById('storageGroup'); group.innerHTML = selectedModel.storage.map(s => { const label = s >= 1024 ? (s/1024)+' ТБ' : s+' ГБ'; return `<span class="pill ${selectedStorage === s ? 'selected' : ''}" data-storage="${s}">${label}</span>`; }).join(''); document.getElementById('storageLabel').textContent = ` — ${selectedStorage >= 1024 ? (selectedStorage/1024)+' ТБ' : selectedStorage+' ГБ'}`; Array.from(group.children).forEach(el => el.addEventListener('click', () => { selectedStorage = parseInt(el.dataset.storage); renderStorage(); validateCalculate(); saveState(); })); }
+    function renderSim() { const group = document.getElementById('simGroup'); group.innerHTML = selectedModel.sim.map(opt => `<span class="pill ${selectedSim === opt ? 'selected' : ''}" data-sim="${opt}">${opt}</span>`).join(''); document.getElementById('simLabel').textContent = ` — ${selectedSim}`; Array.from(group.children).forEach(el => el.addEventListener('click', () => { selectedSim = el.dataset.sim; renderSim(); validateCalculate(); saveState(); })); }
+    function renderColors() { const group = document.getElementById('colorGroup'); group.innerHTML = selectedModel.colors.map(c => `<div class="color-dot ${selectedColor === c ? 'selected' : ''}" style="background:${getColorHex(c)};" data-color="${c}"></div>`).join(''); document.getElementById('colorNameLabel').textContent = ` — ${selectedColor} (${getColorName(selectedColor)})`; Array.from(group.children).forEach(dot => dot.addEventListener('click', () => { selectedColor = dot.dataset.color; renderColors(); renderPhonePreview(); validateCalculate(); saveState(); })); }
+    function getColorHex(c) { const map = { "Space Gray":"#262529","Silver":"#E4E4E2","Gold":"#FADCC2","Black":"#1F2020","White":"#F9F6EF","Blue":"#48AEE6","Yellow":"#F9D045","Coral":"#FF6E5A","Product Red":"#B41325","Green":"#AEE1CD","Purple":"#D1CDDA","Midnight Green":"#4E5851","Graphite":"#52514D","Pacific Blue":"#2D4E5C","Midnight":"#232A31","Starlight":"#FAF6F2","Sierra Blue":"#A7C1D9","Alpine Green":"#576856","Deep Purple":"#594F63","Space Black":"#403E3D","Black Titanium":"#3C3C3D","White Titanium":"#F2F1ED","Blue Titanium":"#2F4452","Natural Titanium":"#C2BCB2","Desert Titanium":"#BFA48F","Pink":"#F2ADDA","Teal":"#B0D4D2","Ultramarine":"#9AADF6","Lavender":"#DFCEEA","Mist Blue":"#96AED1","Sage":"#A9B689","Cloud White":"#FCFCFC","Sky Blue":"#F0F9FF","Light Gold":"#FFFCF5","Deep Blue":"#32374A","Cosmic Orange":"#F77E2D","Soft Pink":"#FCE7E6" }; return map[c] || '#888'; }
+    function getColorName(c) { const map = { "Space Gray":"Космический серый","Silver":"Серебристый","Gold":"Золотой","Black":"Чёрный","White":"Белый","Blue":"Синий","Yellow":"Жёлтый","Coral":"Коралловый","Product Red":"Красный","Green":"Зелёный","Purple":"Фиолетовый","Midnight Green":"Полуночный зелёный","Graphite":"Графитовый","Pacific Blue":"Тихоокеанский синий","Midnight":"Полуночный","Starlight":"Звёздный свет","Sierra Blue":"Сьерра-синий","Alpine Green":"Альпийский зелёный","Deep Purple":"Глубокий фиолетовый","Space Black":"Космический чёрный","Black Titanium":"Чёрный титан","White Titanium":"Белый титан","Blue Titanium":"Синий титан","Natural Titanium":"Натуральный титан","Desert Titanium":"Пустынный титан","Pink":"Розовый","Teal":"Бирюзовый","Ultramarine":"Ультрамарин","Lavender":"Лавандовый","Mist Blue":"Туманный синий","Sage":"Шалфей","Cloud White":"Облачно-белый","Sky Blue":"Небесно-голубой","Light Gold":"Светло-золотой","Deep Blue":"Глубокий синий","Cosmic Orange":"Космический оранжевый","Soft Pink":"Мягкий розовый" }; return map[c] || c; }
+    function updateDefectsPanel() { const panel = document.getElementById('defectsPanel'); const available = getAvailableDefects(); panel.innerHTML = available.map(def => { const checked = selectedDefects[def] || false; return `<div class="defect-item"><label class="ios-checkbox"><input type="checkbox" ${checked ? 'checked' : ''} data-defect="${def}"><span class="checkmark"></span>${def}</label></div>`; }).join(''); panel.querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => { selectedDefects[cb.dataset.defect] = cb.checked; updateDefectCount(); saveState(); })); updateDefectCount(); }
+    function updateDefectCount() { document.getElementById('defectCount').textContent = Object.values(selectedDefects).filter(v=>v).length; }
+    function renderCosmetic() { const group = document.getElementById('cosmeticGroup'); group.innerHTML = cosmeticGrades.map(g => `<span class="pill ${cosmetic === g.id ? 'selected' : ''}" data-grade="${g.id}">${g.label}</span>`).join(''); const current = cosmeticGrades.find(g => g.id === cosmetic); document.getElementById('cosmeticDescription').textContent = current ? current.desc : ''; const defectsContainer = document.getElementById('defectsContainer'); if (defectsContainer) { if (getAvailableDefects().length > 0) { if (!defectsContainer.classList.contains('visible')) defectsContainer.classList.add('visible'); updateDefectsPanel(); } else { if (defectsContainer.classList.contains('visible')) defectsContainer.classList.remove('visible'); } } Array.from(group.children).forEach(p => p.addEventListener('click', () => { cosmetic = p.dataset.grade; renderCosmetic(); validateCalculate(); saveState(); })); }
+    function renderKit() { const container = document.getElementById('kitContent'); const items = [{key:'box', label:'Коробка'}, {key:'cable', label:'Кабель'}, {key:'sticker', label:'Наклейка Apple'}, {key:'receipt', label:'Чек'}]; container.innerHTML = items.map(it => `<label class="ios-checkbox"><input type="checkbox" ${kitOptions[it.key] ? 'checked' : ''} data-kit="${it.key}"><span class="checkmark"></span>${it.label}</label>`).join(''); container.querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => { kitOptions[cb.dataset.kit] = cb.checked; saveState(); })); }
+    function validateCalculate() { const currentUser = getCurrentUser(); const calcBtn = document.getElementById('calculateBtn'); calcBtn.disabled = !(selectedModel && selectedStorage && selectedSim && selectedColor && cosmetic && currentUser && isSubscriptionActive()); }
+    function openModelModal() { document.getElementById('modelSearch').value = ''; renderFilteredModels(''); document.getElementById('modelModal').classList.add('open'); }
+    function renderFilteredModels(query) {
+        const list = document.getElementById('modelList');
+        const noRes = document.getElementById('noResults');
+        const filtered = models.filter(m => m.name.toLowerCase().includes(query.toLowerCase()));
+        if (filtered.length === 0) { list.innerHTML = ''; noRes.style.display = 'block'; return; }
+        noRes.style.display = 'none';
+        const grouped = {};
+        filtered.forEach(m => { if (!grouped[m.year]) grouped[m.year] = []; grouped[m.year].push(m); });
+        let html = '';
+        // Жёсткий порядок для 2025 года
+        const order2025 = ["iPhone 17e", "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone Air", "iPhone 17", "iPhone 16e"];
+        Object.keys(grouped).sort((a,b)=>b-a).forEach(year => {
+            html += `<h4 style="margin-top:14px;color:var(--text-secondary);font-size:14px;">${year}</h4>`;
+            if (year === '2025') {
+                // Сортируем только те модели, которые есть в order2025, остальные в конец
+                const sorted = grouped[year].sort((a,b) => {
+                    const idxA = order2025.indexOf(a.name);
+                    const idxB = order2025.indexOf(b.name);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+                sorted.forEach(m => html += `<div class="model-item" data-name="${m.name}">${m.name}</div>`);
+            } else {
+                // Для остальных лет сортировка по флагманскости
+                grouped[year].sort((a,b) => {
+                    const order = (name) => {
+                        if (name.includes('Pro Max')) return 0;
+                        if (name.includes('Pro') && !name.includes('Pro Max')) return 1;
+                        if (name.includes('Plus')) return 2;
+                        if (name.includes('Air')) return 3;
+                        if (name.includes('mini')) return 4;
+                        if (name.includes('e')) return 7;
+                        return 5;
+                    };
+                    const diff = order(a.name) - order(b.name);
+                    if (diff !== 0) return diff;
+                    return a.name.localeCompare(b.name);
+                });
+                grouped[year].forEach(m => html += `<div class="model-item" data-name="${m.name}">${m.name}</div>`);
+            }
+        });
+        list.innerHTML = html;
+        list.querySelectorAll('.model-item').forEach(item => item.addEventListener('click', () => { selectedModel = models.find(m => m.name === item.dataset.name); selectedColor = selectedModel.colors[0]; selectedStorage = selectedModel.storage[0]; selectedSim = selectedModel.sim[0]; updateAll(); closeModal('modelModal'); }));
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function updateAll() { document.getElementById('selectedModelName').textContent = selectedModel.name; document.getElementById('batterySlider').value = batteryHealth; document.getElementById('batteryLabel').textContent = ` — ${batteryHealth}%`; renderPhonePreview(); renderStorage(); renderSim(); renderColors(); renderCosmetic(); renderKit(); if (getCurrentUser()) { document.getElementById('profileRegionLabel').textContent = region.name; document.querySelector('#profileRegionBtn span:last-child').innerText = region.population; } updateUIForAuth(); saveState(); }
+    function getCurrentUser() { return JSON.parse(localStorage.getItem('uppl_currentUser')); }
+    function setCurrentUser(user) { localStorage.setItem('uppl_currentUser', JSON.stringify(user)); }
+    function getSubscription() { return JSON.parse(localStorage.getItem('uppl_subscription')); }
+    function setSubscription(sub) { localStorage.setItem('uppl_subscription', JSON.stringify(sub)); }
+    function isSubscriptionActive() { const sub = getSubscription(); return sub && new Date().getTime() < new Date(sub.expires).getTime(); }
+    let wasSubscriptionActive = false;
+    function updateUIForAuth() { const currentUser = getCurrentUser(); document.getElementById('authFormCard').style.display = currentUser ? 'none' : 'block'; document.getElementById('profileAuth').style.display = currentUser ? 'block' : 'none'; const promoBlock = document.getElementById('promoBlock'); const calcBtn = document.getElementById('calculateBtn'); if (currentUser) { document.getElementById('profileUsername').textContent = '@'+currentUser.username; document.getElementById('avatarLetter').textContent = currentUser.username.charAt(0).toUpperCase(); const active = isSubscriptionActive(); document.getElementById('profileSubStatus').innerHTML = active ? '<span class="status-badge status-active">Активна</span>' : '<span class="status-badge status-inactive">Неактивна</span>'; document.getElementById('profileSubExpiry').textContent = active ? 'До ' + new Date(getSubscription().expires).toLocaleString() : ''; calcBtn.disabled = !active; promoBlock.style.display = active ? 'none' : 'block'; if (wasSubscriptionActive && !active && currentUser) { document.getElementById('expiredModal').classList.add('open'); } wasSubscriptionActive = active; } else { calcBtn.disabled = true; promoBlock.style.display = 'none'; wasSubscriptionActive = false; } validateCalculate(); document.getElementById('profileRegionLabel').textContent = region.name; document.querySelector('#profileRegionBtn span:last-child').innerText = region.population; }
+    async function activatePromo(code, msgElem, inputElement) { const currentUser = getCurrentUser(); if (!currentUser) return; if (!code || code.length < 4) { msgElem.textContent = 'Введите промокод'; msgElem.style.color = 'var(--red)'; setTimeout(() => { msgElem.textContent = ''; }, 2000); return; } try { const response = await fetch('https://uppl-api.onrender.com/api/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code.trim(), username: currentUser.username }) }); const data = await response.json(); if (data.success) { const expires = new Date(data.expires); setSubscription({ expires: expires.toISOString() }); msgElem.innerHTML = 'Подписка активирована! <span class="promo-success">✓</span>'; msgElem.style.color = 'var(--green)'; setTimeout(() => { msgElem.textContent = ''; }, 2000); updateUIForAuth(); inputElement.value = ''; } else { msgElem.textContent = data.error || 'Ошибка активации'; msgElem.style.color = 'var(--red)'; setTimeout(() => { msgElem.textContent = ''; }, 2000); } } catch (err) { msgElem.textContent = 'Ошибка соединения с сервером'; msgElem.style.color = 'var(--red)'; setTimeout(() => { msgElem.textContent = ''; }, 2000); } }
+    function validateUsername(username) { return /^[a-zA-Z][a-zA-Z0-9]{3,}$/.test(username); }
+    function switchForm(hideId, showId) { const hideEl = document.getElementById(hideId); const showEl = document.getElementById(showId); const card = document.getElementById('authFormCard'); card.style.minHeight = showEl.scrollHeight + 100 + 'px'; hideEl.style.opacity = '0'; hideEl.style.transform = 'translateY(10px)'; hideEl.style.transition = 'opacity 0.2s, transform 0.2s'; setTimeout(() => { hideEl.style.display = 'none'; showEl.style.display = 'block'; showEl.style.opacity = '0'; showEl.style.transform = 'translateY(10px)'; requestAnimationFrame(() => { showEl.style.transition = 'opacity 0.2s, transform 0.2s'; showEl.style.opacity = '1'; showEl.style.transform = 'translateY(0)'; }); }, 200); }
+    document.getElementById('switchToRegister').addEventListener('click', () => switchForm('loginForm', 'registerForm'));
+    document.getElementById('switchToLogin').addEventListener('click', () => switchForm('registerForm', 'loginForm'));
+    document.getElementById('loginBtn').addEventListener('click', async () => { const u = document.getElementById('loginUsername').value.trim().toLowerCase(); const p = document.getElementById('loginPassword').value; if (!validateUsername(u)) { document.getElementById('authMsg').textContent = 'Логин: англ. буквы/цифры, от 4'; return; } if (!p) { document.getElementById('authMsg').textContent = 'Введите пароль'; return; } try { const res = await fetch('https://uppl-api.onrender.com/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) }); const data = await res.json(); if (data.success) { setCurrentUser({ username: u, password: p }); if (data.expires) { setSubscription({ expires: data.expires }); } else { localStorage.removeItem('uppl_subscription'); } localStorage.setItem('uppl_region', JSON.stringify(region)); updateUIForAuth(); } else { document.getElementById('authMsg').textContent = data.error || 'Неверные данные'; } } catch (e) { document.getElementById('authMsg').textContent = 'Ошибка соединения'; } });
+    document.getElementById('registerBtn').addEventListener('click', async () => { const u = document.getElementById('regUsername').value.trim().toLowerCase(); const p = document.getElementById('regPassword').value; const pr = document.getElementById('regPasswordRepeat').value; if (!validateUsername(u)) { document.getElementById('regMsg').textContent = 'Логин: англ. буквы/цифры, от 4'; return; } if (!p || p !== pr) { document.getElementById('regMsg').textContent = 'Пароли не совпадают'; return; } try { const res = await fetch('https://uppl-api.onrender.com/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) }); const data = await res.json(); if (data.success) { setCurrentUser({ username: u, password: p }); localStorage.removeItem('uppl_subscription'); localStorage.setItem('uppl_region', JSON.stringify(region)); updateUIForAuth(); } else { document.getElementById('regMsg').textContent = data.error || 'Ошибка регистрации'; } } catch (e) { document.getElementById('regMsg').textContent = 'Ошибка соединения'; } });
+    document.querySelectorAll('#loginUsername, #loginPassword').forEach(inp => inp.addEventListener('input', () => document.getElementById('authMsg').textContent = ''));
+    document.querySelectorAll('#regUsername, #regPassword, #regPasswordRepeat').forEach(inp => inp.addEventListener('input', () => document.getElementById('regMsg').textContent = ''));
+    document.getElementById('logoutBtn').addEventListener('click', () => document.getElementById('logoutModal').classList.add('open'));
+    document.getElementById('cancelLogoutBtn').addEventListener('click', () => closeModal('logoutModal'));
+    document.getElementById('confirmLogoutBtn').addEventListener('click', () => { localStorage.removeItem('uppl_currentUser'); closeModal('logoutModal'); updateUIForAuth(); });
+    document.getElementById('activatePromoBtn').addEventListener('click', () => activatePromo(document.getElementById('promoInput').value.trim(), document.getElementById('promoMsg'), document.getElementById('promoInput')));
+    document.getElementById('activateProfilePromoBtn').addEventListener('click', () => activatePromo(document.getElementById('profilePromoInput').value.trim(), document.getElementById('profilePromoMsg'), document.getElementById('profilePromoInput')));
+    document.getElementById('profileRegionBtn').addEventListener('click', () => { renderRegionOptions(''); document.getElementById('regionSearch').value = ''; document.getElementById('regionModal').classList.add('open'); });
+    setInterval(updateUIForAuth, 5000);
+    function addSwipeToClose(sheetId, overlayId, handleId) { const sheet = document.getElementById(sheetId); const handle = document.getElementById(handleId); const overlay = document.getElementById(overlayId); let startY = 0, dragging = false; handle.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; dragging = true; sheet.style.transition = 'none'; }); window.addEventListener('touchmove', (e) => { if (!dragging) return; const deltaY = e.touches[0].clientY - startY; if (deltaY > 0) sheet.style.transform = `translateY(${deltaY}px)`; }); window.addEventListener('touchend', (e) => { if (!dragging) return; dragging = false; const deltaY = e.changedTouches[0].clientY - startY; sheet.style.transition = 'transform 0.3s ease'; if (deltaY > 60) overlay.classList.remove('open'); else sheet.style.transform = ''; }); }
+    addSwipeToClose('modelSheet', 'modelModal', 'modelHandle'); addSwipeToClose('regionSheet', 'regionModal', 'regionHandle'); addSwipeToClose('resultSheet', 'resultModal', 'resultHandle'); addSwipeToClose('logoutSheet', 'logoutModal', 'logoutHandle'); addSwipeToClose('helpSheet', 'helpModal', 'helpHandle'); addSwipeToClose('expiredSheet', 'expiredModal', 'expiredHandle');
+    document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', () => { const screen = tab.dataset.screen; document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('screen-'+screen).classList.add('active'); document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); tab.classList.add('active'); if (screen === 'profile') updateUIForAuth(); saveState(); }); });
+    document.getElementById('defectsToggle').addEventListener('click', function() { this.classList.toggle('open'); document.getElementById('defectsPanel').classList.toggle('open'); });
+    document.getElementById('kitToggle').addEventListener('click', function() { this.classList.toggle('open'); document.getElementById('kitContent').classList.toggle('open'); });
+    document.getElementById('promoToggle').addEventListener('click', function() { this.classList.toggle('open'); document.getElementById('promoContent').classList.toggle('open'); });
+    document.getElementById('selectModelBtn').addEventListener('click', openModelModal);
+    document.getElementById('regionSearch').addEventListener('input', e => renderRegionOptions(e.target.value));
+    document.getElementById('batterySlider').addEventListener('input', function(e) { batteryHealth = parseInt(this.value); document.getElementById('batteryLabel').textContent = ` — ${batteryHealth}%`; validateCalculate(); saveState(); });
+    document.getElementById('modelSearch').addEventListener('input', e => renderFilteredModels(e.target.value));
+    function renderRegionOptions(query) { const filtered = cities.filter(c => c.name.toLowerCase().includes(query.toLowerCase())); const container = document.getElementById('regionOptions'); if (!filtered.length) { container.innerHTML = '<div class="empty-search">😔 Ничего не найдено</div>'; return; } let html = ''; filtered.forEach(c => html += `<div class="model-item" data-name="${c.name}" data-coeff="${c.coeff}" data-pop="${c.population}">${c.name}<span style="float:right;color:var(--text-secondary);font-size:12px;">${c.population}</span></div>`); container.innerHTML = html; container.querySelectorAll('.model-item').forEach(el => el.addEventListener('click', () => { region = { name: el.dataset.name, coeff: +el.dataset.coeff, population: el.dataset.pop }; document.getElementById('profileRegionLabel').textContent = region.name; document.querySelector('#profileRegionBtn span:last-child').innerText = region.population; localStorage.setItem('uppl_region', JSON.stringify(region)); closeModal('regionModal'); updateUIForAuth(); saveState(); })); }
+    document.getElementById('calculateBtn').addEventListener('click', async () => { if (!getCurrentUser() || !isSubscriptionActive()) return; const payload = { model: selectedModel.name, storage: selectedStorage, sim: selectedSim, color: selectedColor, battery: batteryHealth, cosmetic: cosmetic, defects: selectedDefects, kit: kitOptions, region: region.name }; try { const response = await fetch('https://uppl-api.onrender.com/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const data = await response.json(); const market = Math.round(data.marketPrice); const buy = data.buyPrice; const sell = data.sellPrice; document.getElementById('resultContent').innerHTML = `<div style="text-align:center;margin-bottom:16px;"><strong>${payload.model}</strong><br>${payload.storage} ГБ • ${payload.sim} • ${payload.color} • АКБ ${payload.battery}%</div><div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:8px;"><div style="display:flex; align-items:baseline; gap:4px;"><span class="price-label" style="font-size:16px; vertical-align:middle;">~</span><span class="price-value">${market.toLocaleString()} ₽</span></div><div style="font-size:13px; color:var(--text-secondary);">Рыночная цена</div></div><div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:8px;"><div style="display:flex; align-items:baseline; gap:4px;"><span class="price-label">до</span><span class="price-value" style="color:var(--accent);">${buy.toLocaleString()} ₽</span></div><div style="font-size:13px; color:var(--text-secondary);">Цена покупки</div></div><div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:8px;"><div style="display:flex; align-items:baseline; gap:4px;"><span class="price-label">от</span><span class="price-value" style="color:var(--green);">${sell.toLocaleString()} ₽</span></div><div style="font-size:13px; color:var(--text-secondary);">Цена продажи</div></div><button class="btn btn-full" id="closeResultBtn">Закрыть</button>`; document.getElementById('resultModal').classList.add('open'); document.getElementById('closeResultBtn').addEventListener('click', () => closeModal('resultModal')); } catch (err) { alert('Ошибка соединения с сервером. Попробуйте позже.'); } });
+    document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+    document.getElementById('promoHelpIcon').addEventListener('click', () => document.getElementById('helpModal').classList.add('open')); document.getElementById('profilePromoHelpIcon').addEventListener('click', () => document.getElementById('helpModal').classList.add('open')); document.getElementById('closeHelpBtn').addEventListener('click', () => closeModal('helpModal'));
+    document.getElementById('closeExpiredBtn').addEventListener('click', () => closeModal('expiredModal'));
+    const savedRegion = localStorage.getItem('uppl_region'); if (savedRegion) { try { region = JSON.parse(savedRegion); } catch (e) {} }
+    loadState(); updateAll();
+</script>
+</body>
+</html>
