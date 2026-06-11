@@ -58,15 +58,15 @@ type AuthResponse struct {
 }
 
 var basePrices = map[string]float64{
-	"iPhone X": 12500, "iPhone XR": 13000, "iPhone XS": 12500, "iPhone XS Max": 15500,
-	"iPhone 11": 15000, "iPhone 11 Pro": 19000, "iPhone 11 Pro Max": 23000,
-	"iPhone 12 mini": 15500, "iPhone 12": 19000, "iPhone 12 Pro": 28000, "iPhone 12 Pro Max": 33000,
-	"iPhone 13 mini": 20000, "iPhone 13": 28000, "iPhone 13 Pro": 37000, "iPhone 13 Pro Max": 43000,
-	"iPhone 14": 35000, "iPhone 14 Plus": 35000, "iPhone 14 Pro": 46000, "iPhone 14 Pro Max": 50000,
-	"iPhone 15": 45000, "iPhone 15 Plus": 45000, "iPhone 15 Pro": 56000, "iPhone 15 Pro Max": 65000,
-	"iPhone 16": 60000, "iPhone 16 Plus": 60000, "iPhone 16 Pro": 75000, "iPhone 16 Pro Max": 90000,
-	"iPhone 16e": 60000, "iPhone 17": 85000, "iPhone 17 Air": 85000, "iPhone 17 Pro": 105000, "iPhone 17 Pro Max": 110000,
-	"iPhone 17e": 85000,
+	"iPhone X": 12200, "iPhone XR": 12700, "iPhone XS": 12200, "iPhone XS Max": 15100,
+	"iPhone 11": 14700, "iPhone 11 Pro": 18600, "iPhone 11 Pro Max": 22500,
+	"iPhone 12 mini": 15200, "iPhone 12": 18600, "iPhone 12 Pro": 27400, "iPhone 12 Pro Max": 32300,
+	"iPhone 13 mini": 19600, "iPhone 13": 27400, "iPhone 13 Pro": 36200, "iPhone 13 Pro Max": 42000,
+	"iPhone 14": 34200, "iPhone 14 Plus": 34200, "iPhone 14 Pro": 44900, "iPhone 14 Pro Max": 48800,
+	"iPhone 15": 43900, "iPhone 15 Plus": 43900, "iPhone 15 Pro": 54600, "iPhone 15 Pro Max": 63400,
+	"iPhone 16": 58200, "iPhone 16 Plus": 58200, "iPhone 16 Pro": 72700, "iPhone 16 Pro Max": 87300,
+	"iPhone 16e": 58200, "iPhone 17": 82000, "iPhone Air": 82000, "iPhone 17 Pro": 101000, "iPhone 17 Pro Max": 105500,
+	"iPhone 17e": 82000,
 }
 
 var regionCoeffs = map[string]float64{
@@ -435,7 +435,7 @@ func getModelYear(model string) int {
 		return 2023
 	case "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 16e":
 		return 2024
-	case "iPhone 17", "iPhone 17 Air", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 17e":
+	case "iPhone 17", "iPhone Air", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 17e":
 		return 2025
 	default:
 		return 2025
